@@ -3,11 +3,27 @@ import { discordSdk, obtenerAvatarUrl } from "./discordSdk.js";
 import Tablero from "./Tablero.jsx";
 import Teclado from "./Teclado.jsx";
 import OtrosJugadores from "./OtrosJugadores.jsx";
-import Ranking from "./Ranking.jsx";
+import RankingTop3 from "./RankingTop3.jsx";
+import RankingDetallado from "./RankingDetallado.jsx";
 import Notificaciones from "./Notificaciones.jsx";
 import Confeti from "./Confeti.jsx";
+import Configuracion from "./Configuracion.jsx";
+import Pistas from "./Pistas.jsx";
+import BotonPista from "./BotonPista.jsx";
+import ResumenRonda from "./ResumenRonda.jsx";
 
 const TECLAS_LETRA = /^[A-ZÑ]$/;
+const CLAVE_TEMA = "wordes-tema";
+
+function obtenerTemaInicial() {
+  try {
+    const guardado = localStorage.getItem(CLAVE_TEMA);
+    if (guardado === "claro" || guardado === "oscuro") return guardado;
+  } catch {
+    // localStorage puede no estar disponible (ej. almacenamiento bloqueado)
+  }
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "claro" : "oscuro";
+}
 
 export default function App() {
   const [listo, setListo] = useState(false);
@@ -18,8 +34,24 @@ export default function App() {
   const [errorIntento, setErrorIntento] = useState(null);
   const [notificaciones, setNotificaciones] = useState([]);
   const [confetiActivo, setConfetiActivo] = useState(false);
+  const [resumenRonda, setResumenRonda] = useState(null);
+  const [tema, setTema] = useState(obtenerTemaInicial);
+  const [configuracionAbierta, setConfiguracionAbierta] = useState(false);
+  const [rankingAbierto, setRankingAbierto] = useState(false);
   const wsRef = useRef(null);
   const ganoAnteriorRef = useRef(false);
+
+  // Tema claro/oscuro: se aplica como atributo en <html> (así lo puede leer
+  // el CSS) y se guarda para la próxima vez. index.html ya lo aplica una
+  // vez al cargar la página para evitar el parpadeo del tema equivocado.
+  useEffect(() => {
+    document.documentElement.dataset.tema = tema;
+    try {
+      localStorage.setItem(CLAVE_TEMA, tema);
+    } catch {
+      // sin almacenamiento disponible no pasa nada grave, sólo no persiste
+    }
+  }, [tema]);
 
   useEffect(() => {
     async function conectar() {
@@ -72,12 +104,18 @@ export default function App() {
 
           if (mensaje.tipo === "estado") {
             setEstado(mensaje);
+            if (mensaje.propio.intentos.length === 0) {
+              // Arrancó una ronda nueva (la haya pedido este jugador u otro).
+              setResumenRonda(null);
+            }
           } else if (mensaje.tipo === "evento") {
             const id = crypto.randomUUID();
             setNotificaciones((actuales) => [...actuales, { id, ...mensaje }]);
             setTimeout(() => {
               setNotificaciones((actuales) => actuales.filter((n) => n.id !== id));
             }, 4000);
+          } else if (mensaje.tipo === "resumen_ronda") {
+            setResumenRonda(mensaje.desglose);
           } else if (mensaje.tipo === "error") {
             setErrorIntento(mensaje.mensaje);
             setTimeout(() => setErrorIntento(null), 2000);
@@ -117,6 +155,10 @@ export default function App() {
     if (intentoActual.length !== 5 || !wsRef.current) return;
     wsRef.current.send(JSON.stringify({ tipo: "intento", palabra: intentoActual }));
     setIntentoActual("");
+  }
+
+  function pedirPista() {
+    wsRef.current?.send(JSON.stringify({ tipo: "pista" }));
   }
 
   function nuevaPartida() {
@@ -159,39 +201,82 @@ export default function App() {
       <Confeti activo={confetiActivo} onFin={() => setConfetiActivo(false)} />
       <Notificaciones notificaciones={notificaciones} />
 
-      <h1 className="titulo">Wordle</h1>
-
-      {estado.cargando || !estado.propio ? (
-        <p className="mensaje-cargando">Buscando una palabra nueva…</p>
-      ) : (
-        <>
-          <Tablero
-            propio={estado.propio}
-            maxIntentos={estado.maxIntentos}
-            intentoActual={intentoActual}
-            filaConError={!!errorIntento}
-          />
-
-          {errorIntento && <p className="mensaje-error">{errorIntento}</p>}
-
-          {estado.propio.finalizado ? (
-            <>
-              <button className="boton-nueva-partida" onClick={nuevaPartida}>
-                Nueva partida
-              </button>
-              <p className="mensaje-final">
-                {estado.propio.gano ? "Adivinaste la palabra." : "Se acabaron tus intentos."} La
-                palabra era <strong>{estado.palabra}</strong>.
-              </p>
-            </>
-          ) : (
-            <Teclado partida={estado.propio} onLetra={agregarLetra} onBorrar={borrarLetra} onEnter={enviarIntento} />
-          )}
-        </>
+      {configuracionAbierta && (
+        <Configuracion tema={tema} onCambiarTema={setTema} onCerrar={() => setConfiguracionAbierta(false)} />
       )}
 
-      <OtrosJugadores jugadores={estado.jugadores} propioId={usuario?.id} maxIntentos={estado.maxIntentos} />
-      <Ranking ranking={estado.ranking} />
+      {rankingAbierto && (
+        <RankingDetallado ranking={estado.ranking} onCerrar={() => setRankingAbierto(false)} />
+      )}
+
+      <header className="encabezado">
+        <h1 className="titulo">WordEs</h1>
+        <button
+          className="boton-icono"
+          onClick={() => setConfiguracionAbierta(true)}
+          aria-label="Configuración"
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+      </header>
+
+      <div className="diseño">
+        <aside className="columna columna-izquierda">
+          <OtrosJugadores jugadores={estado.jugadores} propioId={usuario?.id} maxIntentos={estado.maxIntentos} />
+        </aside>
+
+        <main className="columna columna-centro">
+          {estado.cargando || !estado.propio ? (
+            <p className="mensaje-cargando">Buscando una palabra nueva…</p>
+          ) : (
+            <>
+              <Tablero
+                propio={estado.propio}
+                maxIntentos={estado.maxIntentos}
+                intentoActual={intentoActual}
+                filaConError={!!errorIntento}
+              />
+
+              <Pistas pistas={estado.propio.pistas} />
+
+              {errorIntento && <p className="mensaje-error">{errorIntento}</p>}
+
+              {estado.propio.finalizado ? (
+                <>
+                  <ResumenRonda desglose={resumenRonda} gano={estado.propio.gano} />
+                  <button className="boton-nueva-partida" onClick={nuevaPartida}>
+                    Nueva partida
+                  </button>
+                  <p className="mensaje-final">
+                    La palabra era <strong>{estado.palabra}</strong>.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <BotonPista
+                    pistasUsadas={estado.propio.pistasUsadas}
+                    pistasDisponibles={estado.propio.pistasDisponibles}
+                    onPedir={pedirPista}
+                  />
+                  <Teclado
+                    partida={estado.propio}
+                    onLetra={agregarLetra}
+                    onBorrar={borrarLetra}
+                    onEnter={enviarIntento}
+                  />
+                </>
+              )}
+            </>
+          )}
+        </main>
+
+        <aside className="columna columna-derecha">
+          <RankingTop3 ranking={estado.ranking} onVerDetalle={() => setRankingAbierto(true)} />
+        </aside>
+      </div>
     </div>
   );
 }

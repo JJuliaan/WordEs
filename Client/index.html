@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wordle en Español</title>
+    <title>WordEs</title>
+    <script>
+      // Se hace acá, antes de que React monte, para que la pantalla no
+      // "parpadee" con el tema equivocado un instante al cargar.
+      (function () {
+        try {
+          var guardado = localStorage.getItem("wordes-tema");
+          var tema =
+            guardado === "claro" || guardado === "oscuro"
+              ? guardado
+              : window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "claro"
+                : "oscuro";
+          document.documentElement.dataset.tema = tema;
+        } catch (error) {
+          document.documentElement.dataset.tema = "oscuro";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
