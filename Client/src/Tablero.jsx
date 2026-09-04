@@ -1,8 +1,8 @@
 const MAX_INTENTOS_POR_DEFECTO = 8;
 
-export default function Tablero({ partida, intentoActual }) {
-  const intentos = partida?.intentos ?? [];
-  const maxFilas = partida?.maxIntentos ?? MAX_INTENTOS_POR_DEFECTO;
+export default function Tablero({ propio, maxIntentos, intentoActual, filaConError }) {
+  const intentos = propio?.intentos ?? [];
+  const maxFilas = maxIntentos ?? MAX_INTENTOS_POR_DEFECTO;
   const filas = [];
 
   for (let i = 0; i < maxFilas; i++) {
@@ -22,7 +22,7 @@ export default function Tablero({ partida, intentoActual }) {
       // Fila donde se está escribiendo ahora
       const letras = intentoActual.padEnd(5, " ").split("");
       filas.push(
-        <div className="fila" key={i}>
+        <div className={`fila ${filaConError ? "fila-error" : ""}`} key={i}>
           {letras.map((letra, j) => (
             <div className={`celda ${letra.trim() ? "actual" : ""}`} key={j}>
               {letra.trim()}

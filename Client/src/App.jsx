@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { discordSdk } from "./discordSdk.js";
+import { discordSdk, obtenerAvatarUrl } from "./discordSdk.js";
 import Tablero from "./Tablero.jsx";
 import Teclado from "./Teclado.jsx";
+import OtrosJugadores from "./OtrosJugadores.jsx";
+import Ranking from "./Ranking.jsx";
+import Notificaciones from "./Notificaciones.jsx";
+import Confeti from "./Confeti.jsx";
+
+const TECLAS_LETRA = /^[A-ZÑ]$/;
 
 export default function App() {
   const [listo, setListo] = useState(false);
   const [error, setError] = useState(null);
   const [usuario, setUsuario] = useState(null);
-  const [partida, setPartida] = useState(null);
+  const [estado, setEstado] = useState(null);
   const [intentoActual, setIntentoActual] = useState("");
+  const [errorIntento, setErrorIntento] = useState(null);
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [confetiActivo, setConfetiActivo] = useState(false);
   const wsRef = useRef(null);
+  const ganoAnteriorRef = useRef(false);
 
   useEffect(() => {
     async function conectar() {
@@ -42,13 +52,36 @@ export default function App() {
         setUsuario(auth.user);
 
         // 5) Conectar al WebSocket de nuestro servidor. El instanceId es el
-        //    mismo para todos los que están jugando esta Activity juntos,
-        //    así que sirve como "código de sala" automático.
+        //    mismo para todos los que están jugando esta Activity juntos, así
+        //    que sirve como "código de sala" automático. Le mandamos nuestro
+        //    id/nombre/avatar por query string para que el servidor sepa
+        //    quiénes somos (cada uno tiene su propio tablero en esa sala).
+        const avatar = obtenerAvatarUrl(auth.user);
+        const parametros = new URLSearchParams({
+          user_id: auth.user.id,
+          username: auth.user.global_name || auth.user.username || "Jugador",
+          avatar: avatar ?? "",
+        });
         const protocolo = window.location.protocol === "https:" ? "wss" : "ws";
-        const ws = new WebSocket(`${protocolo}://${window.location.host}/ws/${discordSdk.instanceId}`);
+        const ws = new WebSocket(
+          `${protocolo}://${window.location.host}/ws/${discordSdk.instanceId}?${parametros.toString()}`
+        );
 
         ws.onmessage = (evento) => {
-          setPartida(JSON.parse(evento.data));
+          const mensaje = JSON.parse(evento.data);
+
+          if (mensaje.tipo === "estado") {
+            setEstado(mensaje);
+          } else if (mensaje.tipo === "evento") {
+            const id = crypto.randomUUID();
+            setNotificaciones((actuales) => [...actuales, { id, ...mensaje }]);
+            setTimeout(() => {
+              setNotificaciones((actuales) => actuales.filter((n) => n.id !== id));
+            }, 4000);
+          } else if (mensaje.tipo === "error") {
+            setErrorIntento(mensaje.mensaje);
+            setTimeout(() => setErrorIntento(null), 2000);
+          }
         };
 
         wsRef.current = ws;
@@ -62,8 +95,17 @@ export default function App() {
     conectar();
   }, []);
 
+  // Confeti cuando TU tablero pasa a "ganado" (no cuando ya venías ganado).
+  useEffect(() => {
+    const ganoAhora = estado?.propio?.gano ?? false;
+    if (ganoAhora && !ganoAnteriorRef.current) {
+      setConfetiActivo(true);
+    }
+    ganoAnteriorRef.current = ganoAhora;
+  }, [estado?.propio?.gano]);
+
   function agregarLetra(letra) {
-    if (partida?.finalizada) return;
+    if (estado?.propio?.finalizado || estado?.cargando) return;
     setIntentoActual((actual) => (actual.length < 5 ? actual + letra : actual));
   }
 
@@ -73,13 +115,7 @@ export default function App() {
 
   function enviarIntento() {
     if (intentoActual.length !== 5 || !wsRef.current) return;
-    wsRef.current.send(
-      JSON.stringify({
-        tipo: "intento",
-        palabra: intentoActual,
-        autor: usuario?.username ?? "Jugador",
-      })
-    );
+    wsRef.current.send(JSON.stringify({ tipo: "intento", palabra: intentoActual }));
     setIntentoActual("");
   }
 
@@ -88,39 +124,74 @@ export default function App() {
     setIntentoActual("");
   }
 
+  // Soporte de teclado físico: letras, Enter y Backspace hacen lo mismo que
+  // tocar el teclado en pantalla.
+  useEffect(() => {
+    function manejarTecla(evento) {
+      if (!listo || evento.ctrlKey || evento.metaKey || evento.altKey) return;
+
+      if (evento.key === "Enter") {
+        enviarIntento();
+      } else if (evento.key === "Backspace") {
+        borrarLetra();
+      } else {
+        const tecla = evento.key.toUpperCase();
+        if (TECLAS_LETRA.test(tecla)) {
+          agregarLetra(tecla);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", manejarTecla);
+    return () => window.removeEventListener("keydown", manejarTecla);
+  }, [listo, estado, intentoActual]);
+
   if (error) {
     return <div className="pantalla-centrada">{error}</div>;
   }
 
-  if (!listo) {
+  if (!listo || !estado) {
     return <div className="pantalla-centrada">Conectando con Discord…</div>;
   }
 
   return (
     <div className="app">
-      <h1 className="titulo">🟩 Wordle</h1>
+      <Confeti activo={confetiActivo} onFin={() => setConfetiActivo(false)} />
+      <Notificaciones notificaciones={notificaciones} />
 
-      <Tablero partida={partida} intentoActual={intentoActual} />
+      <h1 className="titulo">Wordle</h1>
 
-      {(!partida || partida.finalizada) ? (
-        <button className="boton-nueva-partida" onClick={nuevaPartida}>
-          🎮 {partida?.finalizada ? "Jugar de nuevo" : "Nueva partida"}
-        </button>
+      {estado.cargando || !estado.propio ? (
+        <p className="mensaje-cargando">Buscando una palabra nueva…</p>
       ) : (
-        <Teclado
-          partida={partida}
-          onLetra={agregarLetra}
-          onBorrar={borrarLetra}
-          onEnter={enviarIntento}
-        />
+        <>
+          <Tablero
+            propio={estado.propio}
+            maxIntentos={estado.maxIntentos}
+            intentoActual={intentoActual}
+            filaConError={!!errorIntento}
+          />
+
+          {errorIntento && <p className="mensaje-error">{errorIntento}</p>}
+
+          {estado.propio.finalizado ? (
+            <>
+              <button className="boton-nueva-partida" onClick={nuevaPartida}>
+                Nueva partida
+              </button>
+              <p className="mensaje-final">
+                {estado.propio.gano ? "Adivinaste la palabra." : "Se acabaron tus intentos."} La
+                palabra era <strong>{estado.palabra}</strong>.
+              </p>
+            </>
+          ) : (
+            <Teclado partida={estado.propio} onLetra={agregarLetra} onBorrar={borrarLetra} onEnter={enviarIntento} />
+          )}
+        </>
       )}
 
-      {partida?.finalizada && (
-        <p className="mensaje-final">
-          {partida.ganador ? `🎉 ¡${partida.ganador} adivinó la palabra!` : "😔 Se acabaron los intentos."}
-          {" "}La palabra era <strong>{partida.palabra}</strong>.
-        </p>
-      )}
+      <OtrosJugadores jugadores={estado.jugadores} propioId={usuario?.id} maxIntentos={estado.maxIntentos} />
+      <Ranking ranking={estado.ranking} />
     </div>
   );
 }
