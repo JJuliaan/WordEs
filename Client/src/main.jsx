@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Preview from "./Preview.jsx";
+import App from "./App.jsx";
 import "./estilos.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(<Preview />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
