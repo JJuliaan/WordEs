@@ -2,3 +2,4 @@ Server/.env
 Client/.env
 Client/node_modules
 Server/venv
+Server/__pycache__

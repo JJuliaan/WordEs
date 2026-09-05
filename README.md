@@ -103,8 +103,8 @@ automáticamente a los jugadores de la misma sala.
 - **Cada vez que reiniciés `cloudflared`, la URL cambia** (a menos que
   configures un túnel con nombre fijo). Si eso pasa, actualizá el Root
   Mapping en el Developer Portal.
-- El estado del juego vive en memoria en `server/main.py` (diccionario
-  `partidas`) — si reiniciás el servidor, las partidas en curso se pierden.
+- El estado del juego vive en memoria en `server/websocket_juego.py` (diccionario
+  `salas`) — si reiniciás el servidor, las partidas en curso se pierden.
   Para producción real, eso se guardaría en una base de datos.
 - `palabras.py` y la lógica de `juego.py` son casi idénticos a los del
   proyecto del bot — podés unificar ambos proyectos más adelante si querés

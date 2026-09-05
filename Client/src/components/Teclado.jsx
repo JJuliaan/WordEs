@@ -1,12 +1,11 @@
-const FILAS_TECLADO = ["QWERTYUIOP", "ASDFGHJKLÑ", "ZXCVBNM"];
-const PRIORIDAD = { ausente: 0, presente: 1, correcto: 2 };
+import { FILAS_TECLADO, PRIORIDAD_TECLA } from "../config/constantes.js";
 
 function calcularEstadoTeclas(partida) {
   const estado = {};
   for (const intento of partida?.intentos ?? []) {
     intento.palabra.split("").forEach((letra, i) => {
       const nuevoEstado = intento.resultado[i];
-      if (!estado[letra] || PRIORIDAD[nuevoEstado] > PRIORIDAD[estado[letra]]) {
+      if (!estado[letra] || PRIORIDAD_TECLA[nuevoEstado] > PRIORIDAD_TECLA[estado[letra]]) {
         estado[letra] = nuevoEstado;
       }
     });

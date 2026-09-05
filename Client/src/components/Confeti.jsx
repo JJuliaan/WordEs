@@ -1,21 +1,18 @@
 import { useEffect, useRef } from "react";
+import { CONFETI_COLORES, CONFETI_DURACION_MS, CONFETI_CANTIDAD_PARTICULAS } from "../config/constantes.js";
 
 // Confeti casero con canvas (sin librerías externas): un par de puñados de
 // rectángulos de colores cayendo con rotación, durante unos segundos.
-const COLORES = ["#538d4e", "#b59f3b", "#6aaa64", "#f5793a", "#85c0f9", "#e63946", "#ffd166"];
-const DURACION_MS = 3200;
-const CANTIDAD_PARTICULAS = 160;
-
 function crearParticulas(ancho, alto) {
   const particulas = [];
-  for (let i = 0; i < CANTIDAD_PARTICULAS; i++) {
+  for (let i = 0; i < CONFETI_CANTIDAD_PARTICULAS; i++) {
     particulas.push({
       x: Math.random() * ancho,
       y: -20 - Math.random() * alto * 0.6,
       velocidadY: 2 + Math.random() * 3,
       velocidadX: -1.5 + Math.random() * 3,
       tamano: 6 + Math.random() * 6,
-      color: COLORES[Math.floor(Math.random() * COLORES.length)],
+      color: CONFETI_COLORES[Math.floor(Math.random() * CONFETI_COLORES.length)],
       rotacion: Math.random() * 360,
       velocidadRotacion: -6 + Math.random() * 12,
     });
@@ -60,7 +57,7 @@ export default function Confeti({ activo, onFin }) {
         contexto.restore();
       }
 
-      if (ahora - inicio < DURACION_MS) {
+      if (ahora - inicio < CONFETI_DURACION_MS) {
         animacionId = requestAnimationFrame(dibujar);
       } else {
         onFinRef.current?.();

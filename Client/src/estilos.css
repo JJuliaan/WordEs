@@ -42,6 +42,11 @@
   --color-perdio: #f4d3d3;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background: var(--color-fondo);
@@ -63,7 +68,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 0 32px;
+  /* clamp() en vez de padding fijo: en una pantalla baja (notebook con
+     escalado de Windows, o el panel de Discord con poco alto disponible)
+     el padding se achica solo en vez de forzar scroll de la página. */
+  padding: clamp(8px, 2vh, 16px) 0 clamp(12px, 4vh, 32px);
   width: 100%;
 }
 
@@ -74,12 +82,12 @@ body {
   position: relative;
   width: 100%;
   max-width: 1100px;
-  margin: 0 auto 16px;
+  margin: 0 auto clamp(8px, 1.5vh, 16px);
   padding: 0 16px;
 }
 
 .titulo {
-  font-size: 28px;
+  font-size: clamp(20px, 3vh, 28px);
   letter-spacing: 2px;
   margin: 0;
 }
@@ -105,7 +113,7 @@ body {
 .diseño {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: clamp(12px, 3vh, 24px);
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
@@ -148,7 +156,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 20px;
+  margin-bottom: clamp(10px, 2.5vh, 20px);
 }
 
 .fila {
@@ -157,14 +165,17 @@ body {
   justify-content: center;
 }
 
+/* Las celdas escalan con el alto de la ventana (clamp con vh), no sólo con
+   el ancho: así un tablero de 8 filas entra sin scroll en pantallas bajas
+   (notebook con escalado de Windows, panel de Discord con poco alto). */
 .celda {
-  width: 52px;
-  height: 52px;
+  width: clamp(32px, 6vh, 52px);
+  height: clamp(32px, 6vh, 52px);
   border: 2px solid var(--color-borde);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: clamp(16px, 3vh, 26px);
   font-weight: bold;
   text-transform: uppercase;
   border-radius: 4px;
@@ -197,7 +208,7 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: clamp(8px, 1.5vh, 16px);
 }
 
 .pista-chip {
@@ -221,7 +232,7 @@ body {
   padding: 8px 14px;
   font-size: 13px;
   cursor: pointer;
-  margin-bottom: 12px;
+  margin-bottom: clamp(6px, 1.2vh, 12px);
 }
 
 .boton-pista:hover {
@@ -253,7 +264,7 @@ body {
   color: var(--color-tecla-texto);
   border: none;
   border-radius: 4px;
-  padding: 14px 0;
+  padding: clamp(8px, 1.8vh, 14px) 0;
   min-width: 32px;
   flex: 1;
   max-width: 42px;
@@ -699,4 +710,30 @@ body {
   background: var(--color-acento);
   color: var(--color-acento-texto);
   font-weight: bold;
+}
+
+/* Viewport bajo (notebook con escalado de Windows, o poco alto disponible
+   dentro del panel de Discord): los clamp() de arriba ya achican todo de
+   forma continua, pero acá bajamos el punto de partida para que 8 filas de
+   tablero + teclado entren sin scroll incluso con menos de ~700px de alto.
+   Tiene que ir DESPUÉS de las reglas base de .celda/.tecla/.app/.diseño:
+   con la misma especificidad, gana la que aparece último en el archivo. */
+@media (max-height: 700px) {
+  .celda {
+    width: clamp(28px, 5vh, 44px);
+    height: clamp(28px, 5vh, 44px);
+    font-size: clamp(14px, 2.6vh, 20px);
+  }
+
+  .tecla {
+    padding: clamp(6px, 1.4vh, 10px) 0;
+  }
+
+  .app {
+    padding: clamp(4px, 1.5vh, 12px) 0 clamp(6px, 2.5vh, 20px);
+  }
+
+  .diseño {
+    gap: clamp(6px, 2vh, 16px);
+  }
 }
