@@ -22,8 +22,11 @@ Toda la configuración (credenciales de Discord, reglas de la partida, valores
 del sistema de puntos) vive en `config.py`, no acá.
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from autenticacion import router as router_autenticacion
 from config import settings
@@ -39,3 +42,16 @@ app.add_middleware(
 
 app.include_router(router_autenticacion)
 app.include_router(router_websocket)
+
+
+# Esto va AL FINAL, después de los include_router de arriba. En producción
+# copiamos el build de React (Client/dist) a Server/static antes de
+# desplegar, y este mismo servidor Python lo sirve — así hay un solo
+# servicio, un solo dominio, sin líos de CORS entre client y server.
+# Como se declara último, /api/token y /ws/... siguen resolviendo ellos
+# mismos primero; esto solo atrapa lo que no coincidió con ninguna ruta de
+# los routers de arriba. En desarrollo local no existe la carpeta "static"
+# (usás `npm run dev` con el proxy de Vite en su lugar), por eso el chequeo
+# de os.path.isdir: sin él, el servidor tiraría error al arrancar en local.
+if os.path.isdir("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
