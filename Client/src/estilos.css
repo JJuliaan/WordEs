@@ -477,20 +477,24 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 2px;
-  background: var(--color-ausente);
+  background: transparent;
+  border: 1px solid var(--color-borde);
   display: inline-block;
 }
 
 .mini-celda.correcto {
   background: var(--color-correcto);
+  border-color: var(--color-correcto);
 }
 
 .mini-celda.presente {
   background: var(--color-presente);
+  border-color: var(--color-presente);
 }
 
 .mini-celda.ausente {
   background: var(--color-ausente);
+  border-color: var(--color-ausente);
 }
 
 .lista-ranking {
