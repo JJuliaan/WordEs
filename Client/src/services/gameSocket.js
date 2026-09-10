@@ -5,12 +5,15 @@ import { discordSdk, obtenerAvatarUrl } from "./discordSdk.js";
 // nuestro id/nombre/avatar por query string para que el servidor sepa
 // quiénes somos (cada uno tiene su propio tablero en esa sala) — no hay un
 // mensaje de "join" aparte, la identidad viaja en la URL de conexión.
+// channel_id es el canal de texto/voz donde se lanzó la Activity — el
+// servidor lo usa para postear la notificación de "alguien está jugando".
 export function conectarGameSocket(usuario, { onMensaje }) {
   const avatar = obtenerAvatarUrl(usuario);
   const parametros = new URLSearchParams({
     user_id: usuario.id,
     username: usuario.global_name || usuario.username || "Jugador",
     avatar: avatar ?? "",
+    channel_id: discordSdk.channelId ?? "",
   });
   const protocolo = window.location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(

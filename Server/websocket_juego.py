@@ -11,6 +11,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from config import settings
 from jugador import Jugador
 from juego import calcular_resultado, normalizar
+from notificaciones import notificar_inicio_partida
 from palabras import palabra_valida
 from sala import Sala
 
@@ -134,6 +135,7 @@ async def canal_juego(websocket: WebSocket, instance_id: str):
     user_id = parametros.get("user_id")
     nombre = parametros.get("username") or "Jugador"
     avatar = parametros.get("avatar") or None
+    channel_id = parametros.get("channel_id") or None
 
     if not user_id:
         await websocket.close(code=4000)
@@ -143,11 +145,13 @@ async def canal_juego(websocket: WebSocket, instance_id: str):
 
     if user_id in sala.jugadores:
         # Reconexión: refrescamos nombre/avatar por si cambiaron, pero
-        # conservamos los intentos que ya tenía en la ronda actual.
+        # conservamos los intentos que ya tenía en la ronda actual. No
+        # notificamos de nuevo — ya avisamos cuando entró la primera vez.
         sala.jugadores[user_id].nombre = nombre
         sala.jugadores[user_id].avatar = avatar
     else:
         sala.jugadores[user_id] = Jugador(user_id, nombre, avatar)
+        await notificar_inicio_partida(channel_id, nombre)
 
     conexiones.setdefault(instance_id, {})[user_id] = websocket
 

@@ -14,9 +14,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    # --- Discord OAuth ---
+    # --- Discord OAuth (identificar usuarios) ---
     discord_client_id: str = ""
     discord_client_secret: str = ""
+
+    # --- Discord Bot (postear mensajes en un canal) ---
+    # Credencial DISTINTA a las de arriba — se saca de Developer Portal →
+    # Bot → Token. Sin esto, notificaciones.py simplemente no manda nada.
+    discord_bot_token: str = ""
 
     # --- Reglas de la partida ---
     max_intentos: int = 8
