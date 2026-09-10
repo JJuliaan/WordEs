@@ -23,21 +23,48 @@ conexiones: dict[str, dict[str, WebSocket]] = {}
 
 
 async def difundir_estado(instance_id: str):
-    """Manda a cada jugador conectado SU vista personalizada del estado."""
+    """Manda a cada jugador conectado SU vista personalizada del estado.
+
+    Importante: si un socket ya está muerto (el jugador se fue justo en este
+    momento, antes de que el bucle principal pudiera detectarlo), no dejamos
+    que eso frene la difusión al resto ni interrumpa lo que venga después
+    (por ejemplo, elegir_palabra() en canal_juego) — lo sacamos de
+    `conexiones` y seguimos.
+    """
     sala = salas.get(instance_id)
     if not sala:
         return
-    for user_id, ws in conexiones.get(instance_id, {}).items():
+
+    conexiones_sala = conexiones.get(instance_id, {})
+    desconectados = []
+
+    for user_id, ws in list(conexiones_sala.items()):
         if user_id not in sala.jugadores:
             continue
-        await ws.send_text(json.dumps(sala.estado_para(user_id)))
+        try:
+            await ws.send_text(json.dumps(sala.estado_para(user_id)))
+        except Exception:
+            desconectados.append(user_id)
+
+    for user_id in desconectados:
+        conexiones_sala.pop(user_id, None)
 
 
 async def difundir_evento(instance_id: str, evento: dict):
-    """Manda una notificación puntual (ej: alguien ganó) a toda la sala."""
+    """Manda una notificación puntual (ej: alguien ganó) a toda la sala.
+    Mismo criterio que difundir_estado: un socket muerto no frena al resto."""
     mensaje = json.dumps({"tipo": "evento", **evento})
-    for ws in conexiones.get(instance_id, {}).values():
-        await ws.send_text(mensaje)
+    conexiones_sala = conexiones.get(instance_id, {})
+    desconectados = []
+
+    for user_id, ws in list(conexiones_sala.items()):
+        try:
+            await ws.send_text(mensaje)
+        except Exception:
+            desconectados.append(user_id)
+
+    for user_id in desconectados:
+        conexiones_sala.pop(user_id, None)
 
 
 async def _manejar_nueva_partida(sala: Sala, instance_id: str):
@@ -124,14 +151,20 @@ async def canal_juego(websocket: WebSocket, instance_id: str):
 
     conexiones.setdefault(instance_id, {})[user_id] = websocket
 
-    if sala.palabra is None and not sala.cargando:
-        sala.resetear()
-        await difundir_estado(instance_id)
-        await sala.elegir_palabra()
-
-    await difundir_estado(instance_id)
-
+    # Todo lo que sigue queda bajo un try/finally: si la conexión se corta
+    # en CUALQUIER punto de acá abajo (no solo dentro del while de mensajes),
+    # el finally garantiza que este jugador se saque de `conexiones`. Antes,
+    # una desconexión temprana (antes de llegar al while) dejaba a la sala
+    # trabada en `cargando = True` para siempre, porque elegir_palabra()
+    # nunca llegaba a ejecutarse.
     try:
+        if sala.palabra is None and not sala.cargando:
+            sala.resetear()
+            await difundir_estado(instance_id)
+            await sala.elegir_palabra()
+
+        await difundir_estado(instance_id)
+
         while True:
             crudo = await websocket.receive_text()
             mensaje = json.loads(crudo)
@@ -146,4 +179,6 @@ async def canal_juego(websocket: WebSocket, instance_id: str):
                 await _manejar_intento(sala, jugador, websocket, instance_id, mensaje["palabra"])
 
     except WebSocketDisconnect:
+        pass
+    finally:
         conexiones.get(instance_id, {}).pop(user_id, None)
