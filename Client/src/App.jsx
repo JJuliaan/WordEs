@@ -56,6 +56,14 @@ export default function App() {
     return <div className="pantalla-centrada">Conectando con Discord…</div>;
   }
 
+  // "Nueva partida" sólo puede pedirse cuando TODOS los jugadores de la sala
+  // terminaron su ronda (ganaron o se quedaron sin intentos) — no alcanza
+  // con que haya terminado uno solo. El servidor ya rechaza el pedido si
+  // esto no se cumple; acá además ocultamos el botón para que la opción ni
+  // aparezca, y mostramos quién falta en su lugar.
+  const jugadoresPendientes = (estado.jugadores ?? []).filter((jugador) => !jugador.finalizado);
+  const todosTerminaron = jugadoresPendientes.length === 0;
+
   return (
     <div className="app">
       <Confeti activo={confeti.activo} onFin={confeti.finalizar} />
@@ -113,9 +121,17 @@ export default function App() {
               {estado.propio.finalizado ? (
                 <>
                   <ResumenRonda desglose={resumenRonda} gano={estado.propio.gano} />
-                  <button className="boton-nueva-partida" onClick={nuevaPartida}>
-                    Nueva partida
-                  </button>
+
+                  {todosTerminaron ? (
+                    <button className="boton-nueva-partida" onClick={nuevaPartida}>
+                      Nueva partida
+                    </button>
+                  ) : (
+                    <p className="mensaje-esperando">
+                      Esperando a que terminen: {jugadoresPendientes.map((j) => j.nombre).join(", ")}
+                    </p>
+                  )}
+
                   <p className="mensaje-final">
                     La palabra era <strong>{estado.palabra}</strong>.
                   </p>

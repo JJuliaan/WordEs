@@ -324,6 +324,13 @@ body {
   border-color: var(--color-texto-tenue);
 }
 
+.mensaje-esperando {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-texto-tenue);
+}
+
 .mensaje-final {
   text-align: center;
   margin-top: 16px;

@@ -68,7 +68,20 @@ async def difundir_evento(instance_id: str, evento: dict):
         conexiones_sala.pop(user_id, None)
 
 
-async def _manejar_nueva_partida(sala: Sala, instance_id: str):
+async def _manejar_nueva_partida(sala: Sala, websocket: WebSocket, instance_id: str):
+    jugadores_sin_terminar = [j for j in sala.jugadores.values() if not j.finalizado]
+    if jugadores_sin_terminar:
+        nombres = ", ".join(j.nombre for j in jugadores_sin_terminar)
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "tipo": "error",
+                    "mensaje": f"Todavía falta que jueguen: {nombres}.",
+                }
+            )
+        )
+        return
+
     sala.resetear()
     await difundir_estado(instance_id)
     await sala.elegir_palabra()
@@ -176,7 +189,7 @@ async def canal_juego(websocket: WebSocket, instance_id: str):
             tipo = mensaje["tipo"]
 
             if tipo == "nueva_partida":
-                await _manejar_nueva_partida(sala, instance_id)
+                await _manejar_nueva_partida(sala, websocket, instance_id)
             elif tipo == "pista" and not sala.cargando and sala.palabra and not jugador.finalizado:
                 await _manejar_pista(sala, jugador, websocket, instance_id)
             elif tipo == "intento" and not sala.cargando and sala.palabra and not jugador.finalizado:
